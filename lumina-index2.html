@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Lumina - Pro Photo Editor</title>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --glass-bg: rgba(18,18,26,0.7);
+  --glass-border: rgba(255,255,255,0.08);
+  --accent: #7c5cfc;
+  --accent2: #5c8cfc;
+  --text: #fff;
+  --text-secondary: rgba(255,255,255,0.6);
+  --radius: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --shadow: 0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1);
+  --glow: 0 0 20px rgba(124,92,252,0.3),0 0 60px rgba(124,92,252,0.1);
+  --safe-bottom: env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;margin:0;padding:0}
+html{font-size:16px;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  position:fixed;
+  inset:0;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-font-smoothing:antialiased
+}
+.glass{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  box-shadow:var(--shadow)
+}
+.glass-light{
+  background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.06)
+}
+.glass-heavy{
+  background:rgba(10,10,15,0.85);
+  backdrop-filter:blur(40px);
+  -webkit-backdrop-filter:blur(40px);
+  border:1px solid rgba(255,255,255,0.1);
+  box-shadow:0 16px 48px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.08)
+}
+.glass-glow{box-shadow:var(--shadow),var(--glow)}
+.text-gradient{
+  background:linear-gradient(135deg,#c4b5fd,#93c5fd,#fda4af);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text
+}
+.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
+.scrollbar-hide::-webkit-scrollbar{display:none}
+button{
+  background:none;border:none;color:inherit;cursor:pointer;font:inherit;
+  -webkit-tap-highlight-color:transparent
+}
+button:active{opacity:0.8}
+canvas{display:block}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;width:100%
+}
+input[type=range]::-webkit-slider-track{height:4px;border-radius:2px;background:rgba(255,255,255,0.1)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4),0 0 0 4px rgba(124,92,252,0.3);margin-top:-10px;cursor:grab
+}
+input[type=range]::-webkit-slider-thumb:active{
+  box-shadow:0 2px 12px rgba(0,0,0,0.5),0 0 0 8px rgba(124,92,252,0.2);cursor:grabbing
+}
+.slider-track-accent{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.animate-in{animation:fadeIn 0.3s ease-out,slideUp 0.4s ease-out}
+.pulse-glow{animation:pulse 2s ease-in-out infinite}
+.shimmer{
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent);
+  background-size:200% 100%;animation:shimmer 2s infinite
+}
+#app{height:100%;overflow:hidden;position:relative}
+#canvas-container{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#gl-canvas{width:100%;height:100%;object-fit:contain}
+#upload-zone{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:2rem}
+#upload-card{
+  padding:2rem;border-radius:var(--radius-xl);text-align:center;max-width:340px;width:100%;
+  border:2px dashed rgba(255,255,255,0.1);transition:border-color 0.3s
+}
+#upload-card.drag-active{border-color:var(--accent);background:rgba(124,92,252,0.08)}
+#upload-icon{width:56px;height:56px;border-radius:50%;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;font-size:28px}
+#toolbar{
+  position:absolute;bottom:0;left:0;right:0;z-index:40;
+  padding:0 8px calc(8px + var(--safe-bottom));animation:slideUp 0.5s ease-out
+}
+#toolbar-inner{
+  border-radius:var(--radius-xl);max-width:500px;margin:0 auto;overflow-x:auto;
+  padding:6px;display:flex;gap:4px
+}
+.tool-btn{
+  flex:0 0 auto;min-width:56px;height:52px;border-radius:14px;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:10px;color:rgba(255,255,255,0.6);transition:all 0.2s
+}
+.tool-btn.active{background:rgba(124,92,252,0.25);color:#fff;box-shadow:0 0 16px rgba(124,92,252,0.25)}
+.tool-btn .icon{font-size:20px;line-height:1}
+#panel{
+  position:absolute;bottom:0;left:0;right:0;z-index:30;max-height:60vh;
+  border-radius:var(--radius-xl) var(--radius-xl) 0 0;margin:0 8px;
+  overflow:hidden;animation:slideUp 0.35s ease-out
+}
+#panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05)
+}
+#panel-body{padding:16px;overflow-y:auto;max-height:calc(60vh - 48px)}
+#undo-redo{position:absolute;top:12px;left:12px;z-index:30;display:flex;gap:8px}
+.ur-btn{
+  width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  transition:opacity 0.2s
+}
+.ur-btn:disabled{opacity:0.25}
+#histogram{position:absolute;top:12px;right:12px;z-index:20;width:100px;height:40px;border-radius:8px;overflow:hidden}
+#gesture-cursor{position:absolute;z-index:50;pointer-events:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);box-shadow:var(--glow);transform:translate(-50%,-50%)}
+#gesture-label{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:50;padding:4px 12px;border-radius:20px;font-size:11px;color:rgba(255,255,255,0.7)}
+#processing-indicator{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:25;padding:6px 16px;border-radius:20px;font-size:11px}
+#gesture-toggle-area{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:8px}
+#gesture-toggle-btn{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(124,92,252,0.2);color:#fff;border:1px solid rgba(124,92,252,0.4)}
+#gesture-status{font-size:11px;color:rgba(255,255,255,0.6)}
+.slider-group{margin-bottom:14px}
+.slider-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:rgba(255,255,255,0.7)}
+.slider-value{color:rgba(255,255,255,0.5);font-variant-numeric:tabular-nums}
+.curve-svg{width:100%;height:160px;border-radius:12px;background:rgba(26,26,37,0.5);cursor:crosshair}
+.lut-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.export-btn{
+  width:100%;padding:12px;border-radius:999px;font-weight:600;font-size:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;margin-top:8px
+}
+.export-btn:disabled{opacity:0.5}
+input[type=file]{display:none}
+.hidden{display:none!important}
+.splash{
+  position:absolute;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);flex-direction:column;gap:16px
+}
+.splash-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));animation:spin 2s linear infinite}
+@media(min-width:430px){
+  #toolbar-inner{gap:6px}
+  .tool-btn{min-width:62px;height:56px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="splash" class="splash">
+    <div class="splash-icon"></div>
+    <div class="text-gradient" style="font-size:28px;font-weight:700">Lumina</div>
+    <div style="color:rgba(255,255,255,0.4);font-size:14px">Pro Photo Editor</div>
+  </div>
+  <div id="canvas-container"><canvas id="gl-canvas"></canvas></div>
+  <div id="upload-zone">
+    <div id="upload-card" class="glass">
+      <div id="upload-icon" class="glass-light">📷</div>
+      <h2 style="font-size:18px;margin-bottom:4px">Import a photo</h2>
+      <p style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:12px">Tap to browse or drag & drop</p>
+      <p style="color:rgba(255,255,255,0.3);font-size:11px;margin-bottom:16px">JPEG, PNG, WebP, AVIF, HEIC</p>
+      <button id="choose-btn" style="padding:10px 24px;border-radius:999px;background:rgba(124,92,252,0.2);color:#fff;font-size:13px;box-shadow:var(--glow)">Choose Photo</button>
+    </div>
+    <input type="file" id="file-input" accept="image/*">
+  </div>
+  <div id="histogram" class="glass-light hidden"><canvas id="hist-canvas" style="width:100%;height:100%"></canvas></div>
+  <div id="undo-redo" class="hidden">
+    <button class="ur-btn glass-light" id="undo-btn" disabled aria-label="Undo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 015 5v2"/><path d="M7 6l-4 4 4 4"/></svg>
+    </button>
+    <button class="ur-btn glass-light" id="redo-btn" disabled aria-label="Redo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10h-10a5 5 0 00-5 5v2"/><path d="M17 6l4 4-4 4"/></svg>
+    </button>
+  </div>
+  <div id="gesture-cursor" class="hidden"></div>
+  <!-- Gesture toggle area (always visible) -->
+  <div id="gesture-toggle-area">
+    <button id="gesture-toggle-btn">🎥 Enable Gesture</button>
+    <span id="gesture-status">Off</span>
+  </div>
+  <div id="processing-indicator" class="glass-light hidden">Processing...</div>
+  <div id="toolbar" class="hidden"><div id="toolbar-inner" class="glass"></div></div>
+  <div id="panel" class="glass-heavy hidden"><div id="panel-header"></div><div id="panel-body" class="scrollbar-hide"></div></div>
+</div>
+
+<script type="module">
+// ==================== LUMINA - COMPLETE PHOTO EDITOR ====================
+
+// ---- State ----
+const state = {
+  image: null, originalImage: null, processedBitmap: null, isProcessing: false,
+  adjustments: {
+    exposure:0,brightness:0,contrast:0,highlights:0,shadows:0,whites:0,blacks:0,
+    temperature:0,tint:0,vibrance:0,saturation:0,
+    clarity:0,texture:0,dehaze:0,sharpening:0,sharpeningRadius:1,sharpeningDetail:25,sharpeningMasking:0,
+    denoise:0,denoiseDetail:50,grain:0,grainSize:25,grainRoughness:50,
+    vignetteAmount:0,vignetteMidpoint:50,vignetteRoundness:0,vignetteFeather:50,vignetteHighlights:0,
+    blurType:'gaussian',blurAmount:0,blurAngle:0,
+    hsl:{red:{h:0,s:0,l:0},orange:{h:0,s:0,l:0},yellow:{h:0,s:0,l:0},green:{h:0,s:0,l:0},aqua:{h:0,s:0,l:0},blue:{h:0,s:0,l:0},purple:{h:0,s:0,l:0},magenta:{h:0,s:0,l:0}},
+    toneCurves:[],activeLUT:null,masks:[]
+  },
+  activeTool:'exposure',zoom:1,panX:0,panY:0,history:[],historyIndex:-1,activeSliderId:null,
+  gesture:{tracking:false,gesture:'none',cursor:null,pinch:0,prevPinch:0}
+};
+
+const defaults = JSON.parse(JSON.stringify(state.adjustments));
+
+// ---- DOM refs ----
+const $ = id => document.getElementById(id);
+const app = $('app'), splash = $('splash'), uploadZone = $('upload-zone'), uploadCard = $('upload-card'),
+  fileInput = $('file-input'), chooseBtn = $('choose-btn'), glCanvas = $('gl-canvas'),
+  toolbar = $('toolbar'), toolbarInner = $('toolbar-inner'), panel = $('panel'),
+  panelHeader = $('panel-header'), panelBody = $('panel-body'), histContainer = $('histogram'),
+  histCanvas = $('hist-canvas'), undoBtn = $('undo-btn'), redoBtn = $('redo-btn'),
+  gestureCursor = $('gesture-cursor'), gestureToggleArea = $('gesture-toggle-area'),
+  gestureToggleBtn = $('gesture-toggle-btn'), gestureStatus = $('gesture-status'),
+  processingInd = $('processing-indicator'), undoRedo = $('undo-redo');
+
+// ---- WebGL ----
+let gl, texture, program, matrixLoc;
+
+function initGL(){
+  gl = glCanvas.getContext('webgl2',{alpha:true,premultipliedAlpha:true}) || glCanvas.getContext('webgl');
+  if(!gl) return;
+  const vert = `attribute vec2 a_position;attribute vec2 a_texCoord;varying vec2 v_texCoord;uniform mat3 u_matrix;void main(){vec3 pos=u_matrix*vec3(a_position,1.0);gl_Position=vec4(pos.xy,0.0,1.0);v_texCoord=a_texCoord;}`;
+  const frag = `precision highp float;varying vec2 v_texCoord;uniform sampler2D u_image;void main(){gl_FragColor=texture2D(u_image,v_texCoord);}`;
+  const compile = (src,type)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s;};
+  program = gl.createProgram();
+  gl.attachShader(program,compile(vert,gl.VERTEX_SHADER));
+  gl.attachShader(program,compile(frag,gl.FRAGMENT_SHADER));
+  gl.linkProgram(program);
+  const pos = new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]);
+  const tex = new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]);
+  const pb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.STATIC_DRAW);
+  const tb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,tb);gl.bufferData(gl.ARRAY_BUFFER,tex,gl.STATIC_DRAW);
+  const pl=gl.getAttribLocation(program,'a_position'),tl=gl.getAttribLocation(program,'a_texCoord');
+  gl.enableVertexAttribArray(pl);gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0);
+  gl.enableVertexAttribArray(tl);gl.bindBuffer(gl.ARRAY_BUFFER,tb);gl.vertexAttribPointer(tl,2,gl.FLOAT,false,0,0);
+  matrixLoc = gl.getUniformLocation(program,'u_matrix');
+  texture = gl.createTexture();
+}
+
+function updateTexture(bitmap){
+  if(!gl) return;
+  gl.bindTexture(gl.TEXTURE_2D,texture);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);
+}
+
+function render(){
+  if(!gl||!state.processedBitmap) return;
+  const c=glCanvas,w=c.width=c.clientWidth*(window.devicePixelRatio||1),h=c.height=c.clientHeight*(window.devicePixelRatio||1);
+  c.style.width=c.clientWidth+'px';c.style.height=c.clientHeight+'px';
+  gl.viewport(0,0,w,h);
+  gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(program);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);
+  gl.uniform1i(gl.getUniformLocation(program,'u_image'),0);
+  const cx=w/2,cy=h/2,s=state.zoom,tx=state.panX*s,ty=state.panY*s;
+  gl.uniformMatrix3fv(matrixLoc,false,[s,0,cx+tx-cx*s,0,s,cy+ty-cy*s,0,0,1]);
+  gl.drawArrays(gl.TRIANGLES,0,6);
+}
+
+// ---- Image Processing Utils ----
+function clamp(v,mn,mx){return Math.max(mn,Math.min(mx,v))}
+function clampByte(v){return clamp(Math.round(v),0,255)}
+function clamp01(v){return clamp(v,0,1)}
+function rgbToHsl(r,g,b){
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let h=0,s=0;
+  if(mx!==mn){const d=mx-mn;s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}
+  return[h,s,l];
+}
+function hslToRgb(h,s,l){
+  if(s===0) return[l,l,l];
+  const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+  const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+  return[hue2rgb(p,q,h+1/3),hue2rgb(p,q,h),hue2rgb(p,q,h-1/3)];
+}
+
+function processImage(){
+  if(!state.originalImage) return;
+  state.isProcessing=true;processingInd.classList.remove('hidden');
+  setTimeout(()=>{
+    const canvas=document.createElement('canvas');
+    const w=state.originalImage.naturalWidth,h=state.originalImage.naturalHeight;
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(state.originalImage,0,0);
+    const imgData=ctx.getImageData(0,0,w,h);
+    let pixels=imgData.data;
+    const adj=state.adjustments;
+
+    for(let i=0;i<pixels.length;i+=4){
+      let r=pixels[i]/255,g=pixels[i+1]/255,b=pixels[i+2]/255;
+
+      // Exposure
+      r*=Math.pow(2,adj.exposure);g*=Math.pow(2,adj.exposure);b*=Math.pow(2,adj.exposure);
+      // Brightness
+      r+=adj.brightness/255;g+=adj.brightness/255;b+=adj.brightness/255;
+      // Contrast
+      const cf=(259*(adj.contrast+255))/(255*(259-adj.contrast));
+      r=cf*(r-0.5)+0.5;g=cf*(g-0.5)+0.5;b=cf*(b-0.5)+0.5;
+      // Highlights/Shadows
+      const hf=adj.highlights/100,sf=adj.shadows/100;
+      r+=sf*Math.pow(1-clamp01(r),2)*0.5-hf*Math.pow(clamp01(r),2)*0.5;
+      g+=sf*Math.pow(1-clamp01(g),2)*0.5-hf*Math.pow(clamp01(g),2)*0.5;
+      b+=sf*Math.pow(1-clamp01(b),2)*0.5-hf*Math.pow(clamp01(b),2)*0.5;
+      // Whites/Blacks
+      if(adj.whites>0){r+=(1-r)*adj.whites/100*r;g+=(1-g)*adj.whites/100*g;b+=(1-b)*adj.whites/100*b;}
+      else{r*=(1+adj.whites/100);g*=(1+adj.whites/100);b*=(1+adj.whites/100);}
+      if(adj.blacks>0){r-=r*adj.blacks/100*(1-r);g-=g*adj.blacks/100*(1-g);b-=b*adj.blacks/100*(1-b);}
+      else{r+=(1-r)*(-adj.blacks/100);g+=(1-g)*(-adj.blacks/100);b+=(1-b)*(-adj.blacks/100);}
+      // Temperature
+      r+=adj.temperature/100*0.2;b-=adj.temperature/100*0.2;
+      // Tint
+      g-=adj.tint/100*0.2;r+=adj.tint/100*0.15;b+=adj.tint/100*0.15;
+      // Vibrance
+      const [,s,l]=rgbToHsl(r,g,b);const vs=s+adj.vibrance/100*(1-s)*s;
+      const[vr,vg,vb]=hslToRgb(rgbToHsl(r,g,b)[0],clamp01(vs),l);
+      r=vr;g=vg;b=vb;
+      // Saturation
+      const[hs,ss,ls]=rgbToHsl(r,g,b);
+      const[nr,ng,nb]=hslToRgb(hs,clamp01(ss+adj.saturation/100),ls);
+      r=nr;g=ng;b=nb;
+
+      // HSL adjustments
+      const[pH,pS,pL]=rgbToHsl(r,g,b);
+      let hAdj=null;
+      const ranges=[{n:'red',mn:0.95,mx:0.05},{n:'orange',mn:0.05,mx:0.11},{n:'yellow',mn:0.11,mx:0.17},{n:'green',mn:0.17,mx:0.42},{n:'aqua',mn:0.42,mx:0.55},{n:'blue',mn:0.55,mx:0.72},{n:'purple',mn:0.72,mx:0.85},{n:'magenta',mn:0.85,mx:0.95}];
+      for(const range of ranges){
+        const inRange=range.mn<range.mx?pH>=range.mn&&pH<=range.mx:pH>=range.mn||pH<=range.mx;
+        if(inRange){hAdj=adj.hsl[range.n];break;}
+      }
+      let fH=pH,fS=pS,fL=pL;
+      if(hAdj){fH=((fH+hAdj.h/360)%1+1)%1;fS=clamp01(fS+hAdj.s/100);fL=clamp01(fL+hAdj.l/100);}
+      const[hr,hg,hb]=hslToRgb(fH,fS,fL);
+      r=hr;g=hg;b=hb;
+
+      // Vignette
+      if(adj.vignetteAmount!==0){
+        const cx=w/2,cy=h/2,px=(i/4)%w,py=Math.floor((i/4)/w);
+        const dx=(px-cx)/cx,dy=(py-cy)/cy;
+        const rf=(adj.vignetteRoundness/100)*0.5+0.5;
+        const dist=Math.sqrt(dx*dx*rf+dy*dy*(2-rf));
+        const mid=adj.vignetteMidpoint/100;
+        let vig=dist>mid?(dist-mid)/(1-mid):0;
+        vig=Math.min(1,Math.max(0,vig));
+        if(vig>0)vig=1-Math.pow(1-vig,1/((adj.vignetteFeather/100)*0.5+0.01));
+        const dk=adj.vignetteAmount<0?-adj.vignetteAmount/100:adj.vignetteAmount/100;
+        if(adj.vignetteAmount<0){r*=(1-vig*dk);g*=(1-vig*dk);b*=(1-vig*dk);}
+        else{r+=(1-r)*vig*dk;g+=(1-g)*vig*dk;b+=(1-b)*vig*dk;}
+      }
+
+      r=clamp01(r);g=clamp01(g);b=clamp01(b);
+      pixels[i]=Math.round(r*255);pixels[i+1]=Math.round(g*255);pixels[i+2]=Math.round(b*255);
+    }
+
+    // Clarity
+    if(adj.clarity>0){
+      const blurred=boxBlur(imgData,21);
+      const bd=blurred.data;
+      for(let i=0;i<pixels.length;i+=4){
+        for(let c=0;c<3;c++){
+          const o=pixels[i+c]/255,bl=bd[i+c]/255;
+          let diff=(o-bl)*(1+adj.clarity/100*2.5);
+          pixels[i+c]=clampByte((bl+diff)*255);
+        }
+      }
+    }
+    // Texture
+    if(adj.texture>0){
+      const sBlur=boxBlur(imgData,3),lBlur=boxBlur(imgData,9);
+      const sd=sBlur.data,ld=lBlur.data;
+      for(let i=0;i<pixels.length;i+=4){
+        for(let c=0;c<3;c++){
+          const v=pixels[i+c]/255,s=sd[i+c]/255,l=ld[i+c]/255;
+          pixels[i+c]=clampByte((v+(s-l)*adj.texture/100*2)*255);
+        }
+      }
+    }
+    // Sharpening
+    if(adj.sharpening>0){
+      const sr=Math.round(adj.sharpeningRadius*2);
+      const sBlur=boxBlur(imgData,sr);
+      const sd=sBlur.data;
+      for(let i=0;i<pixels.length;i+=4){
+        for(let c=0;c<3;c++){
+          const o=pixels[i+c]/255,bl=sd[i+c]/255;
+          let diff=(o-bl)*(adj.sharpening/100)*(1+adj.sharpeningDetail/100*0.5);
+          pixels[i+c]=clampByte((o+diff)*255);
+        }
+      }
+    }
+    // Denoise
+    if(adj.denoise>0){
+      const rad=Math.round(1+adj.denoise/100*3);
+      const src2=new Uint8ClampedArray(pixels);
+      for(let y=rad;y<h-rad;y++){
+        for(let x=rad;x<w-rad;x++){
+          const vr=[],vg=[],vb=[];
+          for(let ky=-rad;ky<=rad;ky++)for(let kx=-rad;kx<=rad;kx++){
+            const idx=((y+ky)*w+(x+kx))*4;
+            vr.push(src2[idx]);vg.push(src2[idx+1]);vb.push(src2[idx+2]);
+          }
+          vr.sort((a,b)=>a-b);vg.sort((a,b)=>a-b);vb.sort((a,b)=>a-b);
+          const mid=Math.floor(vr.length/2),di=(y*w+x)*4;
+          const blend=adj.denoiseDetail/100;
+          pixels[di]=clampByte(vr[mid]*(1-blend)+src2[di]*blend);
+          pixels[di+1]=clampByte(vg[mid]*(1-blend)+src2[di+1]*blend);
+          pixels[di+2]=clampByte(vb[mid]*(1-blend)+src2[di+2]*blend);
+        }
+      }
+    }
+    // Grain
+    if(adj.grain>0){
+      for(let i=0;i<pixels.length;i+=4){
+        const n=(Math.random()-0.5)*2*adj.grain/100*adj.grainRoughness/100;
+        pixels[i]=clampByte(pixels[i]+n*255);
+        pixels[i+1]=clampByte(pixels[i+1]+n*255);
+        pixels[i+2]=clampByte(pixels[i+2]+n*255);
+      }
+    }
+    // Blur
+    if(adj.blurAmount>0){
+      const rad=Math.round(adj.blurAmount/100*20);
+      const bl=boxBlur(new ImageData(pixels,w,h),rad);
+      pixels.set(bl.data);
+    }
+
+    ctx.putImageData(imgData,0,0);
+    createImageBitmap(canvas).then(bm=>{
+      state.processedBitmap=bm;
+      updateTexture(bm);
+      state.isProcessing=false;processingInd.classList.add('hidden');
+      render();
+      updateHistogram();
+    });
+  },50);
+}
+
+function boxBlur(imageData,radius){
+  const w=imageData.width,h=imageData.height;
+  const out=new ImageData(w,h);
+  const src=imageData.data,dst=out.data,temp=new Float32Array(src.length);
+  const ir=Math.round(radius),diam=ir*2+1;
+  for(let y=0;y<h;y++){
+    let sr=0,sg=0,sb=0;
+    for(let x=-ir;x<=ir;x++){const px=Math.min(Math.max(x,0),w-1),idx=(y*w+px)*4;sr+=src[idx];sg+=src[idx+1];sb+=src[idx+2];}
+    for(let x=0;x<w;x++){
+      const idx=(y*w+x)*4;temp[idx]=sr/diam;temp[idx+1]=sg/diam;temp[idx+2]=sb/diam;temp[idx+3]=src[idx+3];
+      const rx=x-ir;if(rx>=0){const ri=(y*w+rx)*4;sr-=src[ri];sg-=src[ri+1];sb-=src[ri+2];}
+      const ax=x+ir+1;if(ax<w){const ai=(y*w+ax)*4;sr+=src[ai];sg+=src[ai+1];sb+=src[ai+2];}
+    }
+  }
+  for(let x=0;x<w;x++){
+    let sr=0,sg=0,sb=0;
+    for(let y=-ir;y<=ir;y++){const py=Math.min(Math.max(y,0),h-1),idx=(py*w+x)*4;sr+=temp[idx];sg+=temp[idx+1];sb+=temp[idx+2];}
+    for(let y=0;y<h;y++){
+      const idx=(y*w+x)*4;dst[idx]=clampByte(sr/diam);dst[idx+1]=clampByte(sg/diam);dst[idx+2]=clampByte(sb/diam);dst[idx+3]=temp[idx+3];
+      const ry=y-ir;if(ry>=0){const ri=(ry*w+x)*4;sr-=temp[ri];sg-=temp[ri+1];sb-=temp[ri+2];}
+      const ay=y+ir+1;if(ay<h){const ai=(ay*w+x)*4;sr+=temp[ai];sg+=temp[ai+1];sb+=temp[ai+2];}
+    }
+  }
+  return out;
+}
+
+// ---- Histogram ----
+function updateHistogram(){
+  if(!state.originalImage) return;
+  histContainer.classList.remove('hidden');
+  const c=histCanvas,w=c.width=100,h=c.height=40;
+  const ctx=c.getContext('2d');
+  const hist={r:new Uint32Array(256),g:new Uint32Array(256),b:new Uint32Array(256),l:new Uint32Array(256)};
+  const canvas=document.createElement('canvas');
+  canvas.width=state.originalImage.naturalWidth;canvas.height=state.originalImage.naturalHeight;
+  const ictx=canvas.getContext('2d');ictx.drawImage(state.originalImage,0,0);
+  const d=ictx.getImageData(0,0,canvas.width,canvas.height).data;
+  for(let i=0;i<d.length;i+=4){
+    hist.r[d[i]]++;hist.g[d[i+1]]++;hist.b[d[i+2]]++;
+    hist.l[Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])]++;
+  }
+  const max=Math.max(...hist.r,...hist.g,...hist.b,...hist.l,1);
+  ctx.clearRect(0,0,w,h);
+  const draw=(data,color,alpha)=>{ctx.fillStyle=color;ctx.globalAlpha=alpha;for(let i=0;i<256;i++){ctx.fillRect(i*w/256,h-(data[i]/max*h),w/256,data[i]/max*h);}ctx.globalAlpha=1;};
+  draw(hist.r,'#ef4444',0.3);draw(hist.g,'#22c55e',0.3);draw(hist.b,'#3b82f6',0.3);draw(hist.l,'#fff',0.4);
+}
+
+// ---- History ----
+function pushHistory(){
+  const snap=JSON.parse(JSON.stringify(state.adjustments));
+  state.history=state.history.slice(0,state.historyIndex+1);
+  state.history.push(snap);state.historyIndex=state.history.length-1;
+  updateUndoRedo();
+}
+function undo(){
+  if(state.historyIndex<0) return;
+  state.historyIndex--;
+  if(state.historyIndex<0) state.adjustments=JSON.parse(JSON.stringify(defaults));
+  else state.adjustments=JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+  processImage();updateUndoRedo();refreshSliders();
+}
+function redo(){
+  if(state.historyIndex>=state.history.length-1) return;
+  state.historyIndex++;
+  state.adjustments=JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+  processImage();updateUndoRedo();refreshSliders();
+}
+function updateUndoRedo(){
+  undoBtn.disabled=state.historyIndex<0;
+  redoBtn.disabled=state.historyIndex>=state.history.length-1;
+}
+
+// ---- UI ----
+const tools=[
+  {id:'exposure',label:'Light',icon:'☀️'},
+  {id:'color',label:'Color',icon:'🎨'},
+  {id:'hsl',label:'HSL',icon:'🌈'},
+  {id:'curves',label:'Curves',icon:'📈'},
+  {id:'detail',label:'Detail',icon:'🔍'},
+  {id:'vignette',label:'Vignette',icon:'🌑'},
+  {id:'blur',label:'Blur',icon:'💧'},
+  {id:'luts',label:'LUTs',icon:'🎞️'},
+  {id:'masks',label:'Masks',icon:'🖌️'},
+  {id:'export',label:'Export',icon:'💾'}
+];
+
+function buildToolbar(){
+  toolbarInner.innerHTML=tools.map(t=>`
+    <button class="tool-btn${state.activeTool===t.id?' active':''}" data-tool="${t.id}">
+      <span class="icon">${t.icon}</span>${t.label}
+    </button>`).join('');
+  toolbarInner.querySelectorAll('.tool-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{state.activeTool=btn.dataset.tool;showPanel();buildToolbar();});
+  });
+}
+
+function showPanel(){
+  toolbar.classList.remove('hidden');
+  panel.classList.remove('hidden');
+  panelHeader.innerHTML=`
+    <span style="font-size:14px;font-weight:600;text-transform:capitalize">${state.activeTool}</span>
+    <button id="close-panel" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.7)">✕</button>`;
+  $('close-panel').addEventListener('click',()=>panel.classList.add('hidden'));
+  renderPanelContent();
+}
+
+function renderPanelContent(){
+  const adj=state.adjustments;
+  let html='';
+  const sl=(label,key,min,max,step=1,def=0,fmt)=>`
+    <div class="slider-group" data-slider="${key}">
+      <div class="slider-label"><span>${label}</span><span class="slider-value">${fmt?fmt(adj[key]):adj[key]}</span></div>
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${adj[key]}" data-key="${key}" data-def="${def}">
+    </div>`;
+
+  switch(state.activeTool){
+    case'exposure':
+      html=sl('Exposure','exposure',-5,5,0.01,0,v=>`${v>0?'+':''}${v.toFixed(2)}`)+
+        sl('Brightness','brightness',-150,150,1)+sl('Contrast','contrast',-150,150,1)+
+        sl('Highlights','highlights',-100,100,1)+sl('Shadows','shadows',-100,100,1)+
+        sl('Whites','whites',-100,100,1)+sl('Blacks','blacks',-100,100,1)+
+        `<button onclick="resetTool('exposure')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset Light</button>`;
+      break;
+    case'color':
+      html=sl('Temperature','temperature',-100,100,1)+sl('Tint','tint',-100,100,1)+
+        sl('Vibrance','vibrance',-100,100,1)+sl('Saturation','saturation',-100,100,1)+
+        `<button onclick="resetTool('color')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset Color</button>`;
+      break;
+    case'hsl':
+      const colors=['red','orange','yellow','green','aqua','blue','purple','magenta'];
+      const colorHex={red:'#ef4444',orange:'#f97316',yellow:'#eab308',green:'#22c55e',aqua:'#06b6d4',blue:'#3b82f6',purple:'#8b5cf6',magenta:'#ec4899'};
+      html=colors.map(c=>`<div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:10px;height:10px;border-radius:50%;background:${colorHex[c]}"></span><span style="font-size:12px;color:rgba(255,255,255,0.8);text-transform:capitalize">${c}</span></div>`+
+        sl('Hue',`hsl.${c}.h`,-180,180,1,0)+sl('Saturation',`hsl.${c}.s`,-100,100,1,0)+sl('Luminance',`hsl.${c}.l`,-100,100,1,0)+`</div>`).join('')+
+        `<button onclick="resetTool('hsl')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset HSL</button>`;
+      break;
+    case'curves':
+      html=`<div style="margin-bottom:8px"><svg class="curve-svg" id="curve-svg" viewBox="0 0 200 200"><defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/></pattern></defs><rect width="200" height="200" fill="url(#g)"/><line x1="0" y1="200" x2="200" y2="0" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg></div>
+        <button onclick="resetTool('curves')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset Curve</button>`;
+      break;
+    case'detail':
+      html=sl('Clarity','clarity',0,100,1)+sl('Texture','texture',0,100,1)+sl('Dehaze','dehaze',0,100,1)+
+        '<div style="border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;margin-top:4px;font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Sharpening</div>'+
+        sl('Amount','sharpening',0,150,1)+sl('Radius','sharpeningRadius',0.5,3,0.1,1,v=>v.toFixed(1))+
+        sl('Detail','sharpeningDetail',0,100,1,25)+sl('Masking','sharpeningMasking',0,100,1)+
+        '<div style="border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;margin-top:4px;font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Noise</div>'+
+        sl('Denoise','denoise',0,100,1)+sl('Denoise Detail','denoiseDetail',0,100,1,50)+
+        '<div style="border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;margin-top:4px;font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Grain</div>'+
+        sl('Amount','grain',0,100,1)+sl('Size','grainSize',1,100,1,25)+sl('Roughness','grainRoughness',0,100,1,50)+
+        `<button onclick="resetTool('detail')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset Detail</button>`;
+      break;
+    case'vignette':
+      html=sl('Amount','vignetteAmount',-100,100,1)+sl('Midpoint','vignetteMidpoint',0,100,1,50)+
+        sl('Roundness','vignetteRoundness',-100,100,1)+sl('Feather','vignetteFeather',0,100,1,50)+
+        sl('Highlights','vignetteHighlights',0,100,1)+
+        `<button onclick="resetTool('vignette')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset Vignette</button>`;
+      break;
+    case'blur':
+      html=`<div style="display:flex;gap:4px;margin-bottom:12px">${['gaussian','lens','motion','radial'].map(t=>`<button class="blur-type-btn" data-type="${t}" style="flex:1;padding:6px;font-size:11px;border-radius:20px;${adj.blurType===t?'background:rgba(124,92,252,0.3);color:#fff':'color:rgba(255,255,255,0.5)'}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</div>`+
+        sl('Amount','blurAmount',0,100,1)+(adj.blurType==='motion'?sl('Angle','blurAngle',0,360,1):'')+
+        `<button onclick="resetTool('blur')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7)">Reset Blur</button>`;
+      break;
+    case'luts':
+      html=`<p style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:12px">Import .cube LUT file</p>
+        <input type="file" id="lut-input" accept=".cube" style="display:none">
+        <button id="lut-import-btn" style="width:100%;padding:10px;font-size:12px;border:1px dashed rgba(255,255,255,0.1);border-radius:12px;color:rgba(124,92,252,0.7)">+ Import .cube LUT</button>
+        <button onclick="resetTool('luts')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7);margin-top:8px">Remove LUT</button>`;
+      break;
+    case'masks':
+      html=`<p style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:12px">Masks allow selective adjustments.</p>
+        ${state.adjustments.masks.map((m,i)=>`<div class="glass-light" style="padding:10px;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px">${m.name}</span><div style="display:flex;gap:8px"><button onclick="toggleMask(${i})" style="font-size:11px;color:${m.enabled?'var(--accent)':'rgba(255,255,255,0.3)'}">${m.enabled?'On':'Off'}</button><button onclick="deleteMask(${i})" style="font-size:11px;color:#ef4444">Del</button></div></div>`).join('')}
+        <button onclick="addMask()" style="width:100%;padding:10px;font-size:12px;border:1px dashed rgba(255,255,255,0.1);border-radius:12px;color:rgba(124,92,252,0.7)">+ Add Mask</button>
+        <button onclick="resetTool('masks')" style="width:100%;padding:8px;font-size:11px;color:rgba(124,92,252,0.7);margin-top:8px">Remove All</button>`;
+      break;
+    case'export':
+      html=`<div style="display:flex;gap:4px;margin-bottom:12px">${['jpeg','png','webp','avif'].map(f=>`<button class="fmt-btn" data-fmt="${f}" style="flex:1;padding:6px;font-size:11px;border-radius:20px;${(state._exportFormat||'jpeg')===f?'background:rgba(124,92,252,0.3);color:#fff':'color:rgba(255,255,255,0.5)'}">${f.toUpperCase()}</button>`).join('')}</div>`+
+        sl('Quality','_exportQuality',1,100,1,92,v=>v+'%')+
+        `<p style="font-size:11px;color:rgba(255,255,255,0.4)">Dimensions: ${state.image?.width||'Original'} × ${state.image?.height||'Original'}</p>
+        <button class="export-btn" id="export-btn">Export Image</button>`;
+      break;
+  }
+  panelBody.innerHTML=html;
+  bindSliders();
+  if(state.activeTool==='blur') bindBlurButtons();
+  if(state.activeTool==='export') bindExportButtons();
+  if(state.activeTool==='luts') bindLUTButtons();
+}
+
+function bindSliders(){
+  panelBody.querySelectorAll('input[type=range]').forEach(sl=>{
+    sl.addEventListener('input',()=>{
+      const key=sl.dataset.key,val=parseFloat(sl.value);
+      setAdjustment(key,val);
+      const valEl=sl.closest('.slider-group').querySelector('.slider-value');
+      if(valEl)valEl.textContent=sl.dataset.key==='exposure'?`${val>0?'+':''}${val.toFixed(2)}`:val;
+    });
+    sl.addEventListener('pointerenter',()=>{state.activeSliderId=sl.dataset.key;});
+    sl.addEventListener('pointerleave',()=>{state.activeSliderId=null;});
+  });
+}
+
+function setAdjustment(key,val){
+  const keys=key.split('.');
+  if(keys.length===1) state.adjustments[key]=val;
+  else if(keys.length===3&&keys[0]==='hsl') state.adjustments.hsl[keys[1]][keys[2]]=val;
+  processImage();
+}
+
+function bindBlurButtons(){
+  panelBody.querySelectorAll('.blur-type-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{state.adjustments.blurType=btn.dataset.type;processImage();showPanel();});
+  });
+}
+function bindExportButtons(){
+  if(!state._exportFormat)state._exportFormat='jpeg';
+  if(!state._exportQuality)state._exportQuality=92;
+  panelBody.querySelectorAll('.fmt-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{state._exportFormat=btn.dataset.fmt;showPanel();});
+  });
+  const qSl=panelBody.querySelector('[data-key="_exportQuality"]');
+  if(qSl)qSl.addEventListener('input',()=>{state._exportQuality=parseInt(qSl.value);});
+  const expBtn=panelBody.querySelector('#export-btn');
+  if(expBtn)expBtn.addEventListener('click',exportImage);
+}
+function bindLUTButtons(){
+  const imp=panelBody.querySelector('#lut-import-btn');
+  const inp=panelBody.querySelector('#lut-input');
+  if(imp&&inp){
+    imp.addEventListener('click',()=>inp.click());
+    inp.addEventListener('change',async(e)=>{
+      const file=e.target.files[0];
+      if(!file) return;
+      const text=await file.text();
+      const lines=text.split('\n').map(l=>l.trim());
+      let size=32;const vals=[];
+      for(const line of lines){
+        if(line.startsWith('#')||!line)continue;
+        if(line.startsWith('LUT_3D_SIZE')){size=parseInt(line.split(/\s+/)[1]);continue;}
+        if(line.startsWith('DOMAIN'))continue;
+        const parts=line.split(/\s+/);
+        if(parts.length>=3)vals.push(parseFloat(parts[0]),parseFloat(parts[1]),parseFloat(parts[2]));
+      }
+      const expected=size*size*size*3;
+      while(vals.length<expected)vals.push(0);
+      const data=new Uint8ClampedArray(size*size*size*4);
+      for(let i=0;i<vals.length;i+=3){
+        data[i*4/3]=Math.round(clamp01(vals[i])*255);
+        data[i*4/3+1]=Math.round(clamp01(vals[i+1])*255);
+        data[i*4/3+2]=Math.round(clamp01(vals[i+2])*255);
+        data[i*4/3+3]=255;
+      }
+      state.adjustments.activeLUT={data,size};
+      processImage();
+      alert('LUT loaded!');
+    });
+  }
+}
+
+function refreshSliders(){
+  if(!panel.classList.contains('hidden')) renderPanelContent();
+}
+
+// ---- Global functions for onclick ----
+window.resetTool=function(tool){
+  const def=JSON.parse(JSON.stringify(defaults));
+  switch(tool){
+    case'exposure':['exposure','brightness','contrast','highlights','shadows','whites','blacks'].forEach(k=>state.adjustments[k]=def[k]);break;
+    case'color':['temperature','tint','vibrance','saturation'].forEach(k=>state.adjustments[k]=def[k]);break;
+    case'hsl':state.adjustments.hsl=JSON.parse(JSON.stringify(def.hsl));break;
+    case'curves':state.adjustments.toneCurves=[];break;
+    case'detail':['clarity','texture','dehaze','sharpening','sharpeningRadius','sharpeningDetail','sharpeningMasking','denoise','denoiseDetail','grain','grainSize','grainRoughness'].forEach(k=>state.adjustments[k]=def[k]);break;
+    case'vignette':['vignetteAmount','vignetteMidpoint','vignetteRoundness','vignetteFeather','vignetteHighlights'].forEach(k=>state.adjustments[k]=def[k]);break;
+    case'blur':state.adjustments.blurAmount=0;state.adjustments.blurAngle=0;state.adjustments.blurType='gaussian';break;
+    case'luts':state.adjustments.activeLUT=null;break;
+    case'masks':state.adjustments.masks=[];break;
+  }
+  processImage();refreshSliders();
+};
+window.addMask=function(){
+  state.adjustments.masks.push({name:`Mask ${state.adjustments.masks.length+1}`,enabled:true});
+  refreshSliders();
+};
+window.toggleMask=function(i){state.adjustments.masks[i].enabled=!state.adjustments.masks[i].enabled;refreshSliders();};
+window.deleteMask=function(i){state.adjustments.masks.splice(i,1);refreshSliders();};
+
+// ---- Export ----
+function exportImage(){
+  if(!state.processedBitmap) return;
+  const canvas=document.createElement('canvas');
+  canvas.width=state.image.width;canvas.height=state.image.height;
+  const ctx=canvas.getContext('2d');ctx.drawImage(state.processedBitmap,0,0);
+  const fmt=state._exportFormat||'jpeg';
+  const qual=(state._exportQuality||92)/100;
+  canvas.toBlob(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`lumina.${fmt}`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },`image/${fmt}`,qual);
+}
+
+// ---- Upload ----
+function loadImage(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      state.originalImage=img;
+      state.image={width:img.naturalWidth,height:img.naturalHeight};
+      state.adjustments=JSON.parse(JSON.stringify(defaults));
+      state.history=[];state.historyIndex=-1;
+      uploadZone.classList.add('hidden');
+      undoRedo.classList.remove('hidden');
+      histContainer.classList.remove('hidden');
+      buildToolbar();toolbar.classList.remove('hidden');
+      processImage();
+      setTimeout(()=>{splash.style.display='none';},500);
+      updateUndoRedo();
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+chooseBtn.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',e=>{if(e.target.files[0])loadImage(e.target.files[0]);});
+uploadCard.addEventListener('dragover',e=>{e.preventDefault();uploadCard.classList.add('drag-active');});
+uploadCard.addEventListener('dragleave',()=>uploadCard.classList.remove('drag-active'));
+uploadCard.addEventListener('drop',e=>{e.preventDefault();uploadCard.classList.remove('drag-active');if(e.dataTransfer.files[0])loadImage(e.dataTransfer.files[0]);});
+
+// ---- Undo/Redo ----
+undoBtn.addEventListener('click',()=>{pushHistory();undo();});
+redoBtn.addEventListener('click',redo);
+
+// ---- Touch gestures for canvas ----
+let touchStartDist=0,touchStartZoom=1,touchStartPanX=0,touchStartPanY=0,touchCount=0;
+glCanvas.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+    touchStartDist=Math.sqrt(dx*dx+dy*dy);touchStartZoom=state.zoom;
+  }else if(e.touches.length===1){
+    touchStartPanX=state.panX;touchStartPanY=state.panY;
+  }
+  touchCount=e.touches.length;
+});
+glCanvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(touchCount===2&&e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(touchStartDist>0){state.zoom=Math.max(0.1,Math.min(10,touchStartZoom*(dist/touchStartDist)));render();}
+  }else if(touchCount===1&&e.touches.length===1){
+    state.panX=touchStartPanX+(e.touches[0].clientX-e.touches[0].clientX)*2;
+    state.panY=touchStartPanY+(e.touches[0].clientY-e.touches[0].clientY)*2;
+    render();
+  }
+},{passive:false});
+glCanvas.addEventListener('touchend',()=>{touchCount=0;});
+
+// ---- Resize ----
+window.addEventListener('resize',()=>{if(state.processedBitmap){updateTexture(state.processedBitmap);render();}});
+
+// ---- Gesture Control (MediaPipe Hands) ----
+let gestureStream=null, gestureVideo=null, gestureHands=null, gestureRAF=null;
+
+async function startGestureControl(){
+  gestureStatus.textContent='Starting...';
+  gestureToggleBtn.disabled=true;
+  try{
+    // Load MediaPipe Hands from CDN
+    if(!window.Hands){
+      await new Promise((resolve,reject)=>{
+        const scripts=[
+          'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js',
+          'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js'
+        ];
+        let loaded=0;
+        scripts.forEach(src=>{
+          const s=document.createElement('script');s.src=src;s.async=true;
+          s.onload=()=>{loaded++;if(loaded===scripts.length)resolve();};
+          s.onerror=reject;document.head.appendChild(s);
+        });
+      });
+    }
+
+    const video=document.createElement('video');
+    video.setAttribute('playsinline','');video.setAttribute('muted','');
+    video.style.display='none';document.body.appendChild(video);
+
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480}});
+    video.srcObject=stream;
+    await video.play();
+    gestureVideo=video;
+    gestureStream=stream;
+
+    const hands=new window.Hands({
+      locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    hands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.5});
+
+    hands.onResults(results=>{
+      if(results.multiHandLandmarks?.length>0){
+        const lm=results.multiHandLandmarks[0];
+        gestureCursor.classList.remove('hidden');
+        const ix=lm[8].x,iy=lm[8].y;
+        gestureCursor.style.left=(ix*100)+'%';gestureCursor.style.top=(iy*100)+'%';
+
+        const thumbExt=lm[4].x>lm[2].x;
+        const fingers=[1,2,3,4].map(i=>lm[[0,8,12,16,20][i]].y<lm[[0,6,10,14,18][i]].y);
+        const count=fingers.filter(Boolean).length+(thumbExt?1:0);
+        let gesture='none';
+        if(count===5) gesture='Open Palm';
+        else if(count===0) gesture='Fist';
+        else if(count===2&&fingers[1]&&fingers[2]) gesture='Peace';
+        else if(count===1&&thumbExt) gesture='Thumbs Up';
+        else if(count===1&&fingers[1]) gesture='Point';
+
+        state.gesture.gesture=gesture;
+        gestureStatus.textContent='Active: '+gesture;
+
+        if(gesture==='Fist'){state.zoom=1;state.panX=0;state.panY=0;render();}
+        if(gesture==='Point'&&state.activeSliderId){
+          const val=1-iy;
+          const sl=panelBody?.querySelector(`[data-key="${state.activeSliderId}"]`);
+          if(sl){
+            const min=parseFloat(sl.min),max=parseFloat(sl.max),step=parseFloat(sl.step)||1;
+            const raw=min+val*(max-min),stepped=Math.round(raw/step)*step;
+            const clamped=Math.max(min,Math.min(max,stepped));
+            sl.value=clamped;setAdjustment(state.activeSliderId,clamped);
+            const valEl=sl.closest('.slider-group')?.querySelector('.slider-value');
+            if(valEl)valEl.textContent=state.activeSliderId==='exposure'?`${clamped>0?'+':''}${clamped.toFixed(2)}`:clamped;
+          }
+        }
+      }else{
+        gestureCursor.classList.add('hidden');
+        gestureStatus.textContent='Active (no hand)';
+        state.gesture.gesture='none';
+      }
+    });
+
+    gestureHands=hands;
+    async function detect(){await hands.send({image:video});gestureRAF=requestAnimationFrame(detect);}
+    detect();
+    state.gesture.tracking=true;
+    gestureStatus.textContent='Active';
+    gestureToggleBtn.textContent='🎥 Disable Gesture';
+    gestureToggleBtn.onclick=stopGestureControl;
+  }catch(e){
+    console.error('Gesture error:',e);
+    gestureStatus.textContent='Failed';
+    alert('Camera access denied or unsupported. Gesture control unavailable.');
+  }finally{
+    gestureToggleBtn.disabled=false;
+  }
+}
+
+function stopGestureControl(){
+  if(gestureRAF)cancelAnimationFrame(gestureRAF);
+  if(gestureHands)gestureHands.close();
+  if(gestureStream)gestureStream.getTracks().forEach(t=>t.stop());
+  if(gestureVideo)gestureVideo.remove();
+  gestureCursor.classList.add('hidden');
+  state.gesture.tracking=false;
+  gestureStatus.textContent='Off';
+  gestureToggleBtn.textContent='🎥 Enable Gesture';
+  gestureToggleBtn.onclick=startGestureControl;
+}
+
+gestureToggleBtn.addEventListener('click',startGestureControl);
+
+// ---- Service Worker ----
+if('serviceWorker' in navigator){
+  const swCode=`
+    const CACHE='lumina-v2';
+    self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/'])).then(()=>self.skipWaiting()));});
+    self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(n=>Promise.all(n.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim()));});
+    self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{if(res.ok){const rc=res.clone();caches.open(CACHE).then(c=>c.put(e.request,rc));}return res;})));});
+  `;
+  const blob=new Blob([swCode],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob),{scope:'/'});
+}
+
+// ---- Init ----
+initGL();
+setTimeout(()=>{splash.style.display='none';},1500);
+console.log('🌟 Lumina ready - Professional Photo Editor');
+console.log('🎥 Tap "Enable Gesture" to start hand tracking');
+console.log('🔒 All processing is local');
+</script>
+</body>
+</html>
